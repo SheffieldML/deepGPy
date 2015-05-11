@@ -1,9 +1,6 @@
-# Copyright (c) 2015 James Hensman
-# Licensed under the BSD 3-clause license (see LICENSE.txt)
-
 import GPy
 import numpy as np
-from GPy.util import choleskies
+import choleskies
 import plotting
 from special_einsum import special_einsum
 
@@ -82,13 +79,12 @@ class Layer(GPy.core.parameterization.Parameterized):
         self.compute_output_dist()
         [l.initialize_inducing(self.q_of_X_out.mean*1) for l in self.lower_layers]
 
-    def predict(self, Xtest):
+    def predict(self, Xtest, full_cov=False, noise_off=False):
         """
         Given the posterior q(U), the kernel and some test points Xtest,
         compute the Gaussian posterior for this layer
         """
         Knm = self.kern.K(Xtest, self.Z)
-        Knn = self.kern.Kdiag(Xtest)
         mu = np.dot(Knm, self.Kmmi).dot(self.q_of_U_mean)
         if self.woodbury_inv is None:
             if self.S_param is 'chol':
@@ -96,15 +92,29 @@ class Layer(GPy.core.parameterization.Parameterized):
             else:
                 self.woodbury_inv = self.Kmmi[:,:,None] - np.einsum('ijk,jl->ilk', self.Kmmi[:,:,None]*self.q_of_U_diags[None,:,:], self.Kmmi)
 
-        var = Knn[:,None] - np.einsum('ij,jkl,ik->il', Knm, self.woodbury_inv, Knm) + 1./self.beta
+        if full_cov:
+            Knn = self.kern.K(Xtest)
+            var = Knn[:,:,None] - np.einsum('ij, jkl,mk->iml', Knm, self.woodbury_inv, Knm)
+            if not noise_off:
+                var += np.eye(Xtest.shape[0])[:,:,None]/self.beta
+        else:
+            Knn = self.kern.Kdiag(Xtest)
+            var = Knn[:,None] - np.einsum('ij,jkl,ik->il', Knm, self.woodbury_inv, Knm)
+            if not noise_off:
+                var += 1./self.beta
         return mu, var
 
-    def posterior_samples(self, Xtest):
+    def posterior_samples(self, Xtest, full_cov=False, noise_off=False):
         """
-        Produce samples from the posterior at the points Xtest
+        Produce samples from the posterior at the points Xtest.
+        
+        if not full_cov, we produce a separate draw for each point in Xtest. Otherwise, a single multivariate (correlated) draw.
         """
-        m, v = self.predict(Xtest)
-        return m + np.random.randn(*m.shape)*np.sqrt(v)
+        m,v = self.predict(Xtest, full_cov=full_cov, noise_off=noise_off)
+        if full_cov:
+            return np.vstack([np.random.multivariate_normal(m[:,i], v[:,:,i]) for i in range(m.shape[1])]).T
+        else:
+            return m + np.random.randn(*m.shape)*np.sqrt(v)
 
     def add_layer(self, layer):
         """
@@ -235,9 +245,9 @@ class HiddenLayer(Layer):
         XX = self.posterior_samples(X)
         return self.lower_layers[0].log_density_sampling(XX, Y)
 
-    def predict_forward_sampling(self, X):
-        XX = self.posterior_samples(X)
-        return self.lower_layers[0].predict_forward_sampling(XX)
+    def predict_forward_sampling(self, X, correlated=False, noise_off=False):
+        XX = self.posterior_samples(X, full_cov=correlated, noise_off=noise_off)
+        return self.lower_layers[0].predict_forward_sampling(XX, correlated=correlated, noise_off=noise_off)
 
     def predict_means(self, X):
         m, v = self.predict(X)
@@ -308,9 +318,9 @@ class InputLayerFixed(Layer):
         XX = self.posterior_samples(X)
         return self.lower_layers[0].log_density_sampling(XX, Y)
 
-    def predict_forward_sampling(self, X):
-        XX = self.posterior_samples(X)
-        return self.lower_layers[0].predict_forward_sampling(XX)
+    def predict_forward_sampling(self, X, correlated=False, noise_off=False):
+        XX = self.posterior_samples(X, full_cov=correlated, noise_off=noise_off)
+        return self.lower_layers[0].predict_forward_sampling(XX, correlated=correlated, noise_off=noise_off)
 
     def predict_means(self, X):
         m, v = self.predict(X)
@@ -395,8 +405,9 @@ class ObservedLayer(Layer):
         from scipy.misc import logsumexp
         return logsumexp(logdensities, axis=0) - np.log(Nsamples)
 
-    def predict_forward_sampling(self, X):
-        return self.posterior_samples(X)
+    def predict_forward_sampling(self, X, correlated=False, noise_off=False):
+        XX = self.posterior_samples(X, full_cov=correlated, noise_off=noise_off)
+        return XX
 
     def predict_means(self, X):
         return self.predict(X)

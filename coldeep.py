@@ -1,6 +1,3 @@
-# Copyright (c) 2015 James Hensman
-# Licensed under the BSD 3-clause license (see LICENSE.txt)
-
 import GPy
 import numpy as np
 from layers import ObservedLayer, InputLayer, HiddenLayer, InputLayerFixed
@@ -10,7 +7,7 @@ except:
     print "mpi not found"
 import sys
 import plotting
-from GPy.util.choleskies import indexes_to_fix_for_low_rank
+from choleskies import indexes_to_fix_for_low_rank
 
 class ColDeep(GPy.core.Model):
     def __init__(self, layers, name='deepgp'):
@@ -36,6 +33,12 @@ class ColDeep(GPy.core.Model):
         """
         XX = np.repeat(Xtest, Ns, axis=0)
         return self.layers[0].predict_forward_sampling(XX).reshape(Ns, Xtest.shape[0], -1, order='F')
+
+    def posterior_sample(self, X):
+        """
+        like predict_sampling, but draw a correlated sample for every layer
+        """
+        return self.layers[0].predict_forward_sampling(X, correlated=True, noise_off=True)
 
     def log_density_sampling(self, X, Y, Ns):
         XX = np.repeat(X, Ns, axis=0)
