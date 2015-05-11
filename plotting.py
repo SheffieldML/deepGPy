@@ -104,10 +104,9 @@ def plot_output_layer(layer):
         #ax2.set_ylim(ax2.get_ylim()[::-1])
 
 
-def plot_deep(model, xlim=None):
+def plot_deep(model, xlim=None, Nsamples=0):
     if model.layerX.input_dim==1 and model.layerY.output_dim==1:
-        fig = plt.figure()
-        ax1 = fig.add_axes([0.1, 0.2, 0.8, 0.7])
+        fig, ax1 = plt.subplots(1)
         if xlim is None:
             Xnew, xmin, xmax = x_frame1D(model.layerX.X, resolution=200)
         else:
@@ -126,8 +125,13 @@ def plot_deep(model, xlim=None):
                            yedges.min(), yedges.max()], 
                    cmap=plt.cm.Blues, 
                    interpolation='nearest',
-                   origin='lower')
+                   origin='lower',
+                   aspect='auto')
         ax1.plot(model.layerX.X, model.layerY.Y, 'kx', mew=1.3)
         ax1.plot(Xnew.flatten(), yTest.flatten())
         ax1.set_ylim(yedges.min(), yedges.max())
         ax1.set_xlim(xmin, xmax)
+
+        for n in range(Nsamples):
+            Y = model.posterior_sample(Xnew)
+            ax1.plot(Xnew, Y, 'r', lw=1.4)

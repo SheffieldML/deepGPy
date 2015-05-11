@@ -64,8 +64,8 @@ class ColDeep(GPy.core.Model):
             l.q_of_U_mean.param_array = p[count:count+size]
             count += size
 
-    def plot(self, xlim=None):
-        plotting.plot_deep(self, xlim)
+    def plot(self, xlim=None, Nsamples=0):
+        plotting.plot_deep(self, xlim, Nsamples)
 
             
 class ColDeepStochastic(ColDeep):
