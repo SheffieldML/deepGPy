@@ -7,7 +7,7 @@ except:
     print "mpi not found"
 import sys
 import plotting
-from choleskies import indexes_to_fix_for_low_rank
+from GPy.util.choleskies import indexes_to_fix_for_low_rank
 
 class ColDeep(GPy.core.Model):
     def __init__(self, layers, name='deepgp'):

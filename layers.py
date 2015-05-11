@@ -1,6 +1,6 @@
 import GPy
 import numpy as np
-import choleskies
+import GPy.util.choleskies
 import plotting
 from special_einsum import special_einsum
 
@@ -35,7 +35,7 @@ class Layer(GPy.core.parameterization.Parameterized):
 
             self.S_param = S_param
             if S_param=='chol':
-                chols = choleskies.triang_to_flat(np.dstack([np.eye(self.num_inducing)*0.1 for i in range(self.output_dim)]))
+                chols = GPy.util.choleskies.triang_to_flat(np.dstack([np.eye(self.num_inducing)*0.1 for i in range(self.output_dim)]))
                 self.q_of_U_choleskies = GPy.core.Param('q(U)_chol', chols)
                 self.link_parameter(self.q_of_U_choleskies)
             elif S_param=='diag':
@@ -130,9 +130,9 @@ class Layer(GPy.core.parameterization.Parameterized):
         self.psi1Kmmi = np.dot(self.psi1, self.Kmmi)
         if not self.natgrads:
             if self.S_param is 'chol':
-                L = choleskies.flat_to_triang(self.q_of_U_choleskies)
+                L = GPy.util.choleskies.flat_to_triang(self.q_of_U_choleskies)
                 self.q_of_U_covariance = np.einsum('ijk,ljk->ilk', L, L)
-                self.q_of_U_precision = choleskies.multiple_dpotri(L)
+                self.q_of_U_precision = GPy.util.choleskies.multiple_dpotri(L)
                 self.q_of_U_cov_logdet = 2.*np.array([np.sum(np.log(np.abs(np.diag(L[:,:,i])))) for i in range(self.output_dim)])
                 uuT = np.dot(self.q_of_U_mean, self.q_of_U_mean.T) + self.q_of_U_covariance.sum(-1)
                 self.psi1KmmiS = np.einsum('ij,jkl->ikl', self.psi1Kmmi, self.q_of_U_covariance) # intermediate computation
@@ -181,9 +181,9 @@ class Layer(GPy.core.parameterization.Parameterized):
         if not self.natgrads:
             self.q_of_U_mean.gradient = self.dL_dEu + 2.*np.einsum('ijk,jk->ik', self.dL_duuT, self.q_of_U_mean)
             if self.S_param is 'chol':
-                L = choleskies.flat_to_triang(self.q_of_U_choleskies)
+                L = GPy.util.choleskies.flat_to_triang(self.q_of_U_choleskies)
                 dL_dchol = 2.*np.einsum('ijk,jlk->ilk', self.dL_duuT, L)
-                self.q_of_U_choleskies.gradient = choleskies.triang_to_flat(dL_dchol)
+                self.q_of_U_choleskies.gradient = GPy.util.choleskies.triang_to_flat(dL_dchol)
             else:
                 self.q_of_U_diags.gradient = np.vstack([np.diag(self.dL_duuT[:,:,i]) for i in xrange(self.output_dim)]).T
 
@@ -377,9 +377,9 @@ class InputLayerFixed(Layer):
 
         self.q_of_U_mean.gradient = self.dL_dEu + 2.*np.einsum('ijk,jk->ik',self.dL_duuT, self.q_of_U_mean)
         if self.S_param is 'chol':
-            L = choleskies.flat_to_triang(self.q_of_U_choleskies)
+            L = GPy.util.choleskies.flat_to_triang(self.q_of_U_choleskies)
             dL_dchol = 2.*np.einsum('ijk,jlk->ilk', self.dL_duuT, L)
-            self.q_of_U_choleskies.gradient = choleskies.triang_to_flat(dL_dchol)
+            self.q_of_U_choleskies.gradient = GPy.util.choleskies.triang_to_flat(dL_dchol)
         else:
             self.q_of_U_diags.gradient = np.vstack([np.diag(self.dL_duuT[:,:,i]) for i in xrange(self.output_dim)]).T
 
