@@ -4,6 +4,7 @@
 from GPy.plotting.matplot_dep.base_plots import gpplot, x_frame1D, x_frame2D
 from matplotlib import pyplot as plt
 import numpy as np
+
 def sausage_plot(layer, Xnew, ax):
     mu, var = layer.predict(Xnew)
     gpplot(Xnew, mu, mu + 2*np.sqrt(var), mu - 2*np.sqrt(var), ax=ax)
@@ -103,4 +104,30 @@ def plot_output_layer(layer):
         #ax2.set_ylim(ax2.get_ylim()[::-1])
 
 
-
+def plot_deep(model, xlim=None):
+    if model.layerX.input_dim==1 and model.layerY.output_dim==1:
+        fig = plt.figure()
+        ax1 = fig.add_axes([0.1, 0.2, 0.8, 0.7])
+        if xlim is None:
+            Xnew, xmin, xmax = x_frame1D(model.layerX.X, resolution=200)
+        else:
+            xmin = xlim[0]
+            xmax = xlim[1]
+            Xnew = np.linspace(xmin, xmax, 200)[:, None]
+        Xnew = np.linspace(xmin,xmax,200)[:,None]
+        s = model.predict_sampling(Xnew, 1000)
+        yTest = model.predict_means(Xnew)[0]
+        H, xedges, yedges = np.histogram2d(np.repeat(Xnew.T,  1000, 0).flatten(), 
+                                           s.flatten(), 
+                                           bins=[Xnew.flatten(),
+                                                 np.linspace(s.min(),s.max(),50)])
+        ax1.imshow(H.T, 
+                   extent=[xedges.min(), xedges.max(),
+                           yedges.min(), yedges.max()], 
+                   cmap=plt.cm.Blues, 
+                   interpolation='nearest',
+                   origin='lower')
+        ax1.plot(model.layerX.X, model.layerY.Y, 'kx', mew=1.3)
+        ax1.plot(Xnew.flatten(), yTest.flatten())
+        ax1.set_ylim(yedges.min(), yedges.max())
+        ax1.set_xlim(xmin, xmax)

@@ -9,6 +9,7 @@ try:
 except:
     print "mpi not found"
 import sys
+import plotting
 from GPy.util.choleskies import indexes_to_fix_for_low_rank
 
 class ColDeep(GPy.core.Model):
@@ -46,6 +47,7 @@ class ColDeep(GPy.core.Model):
 
     def get_natgrad(self):
         return np.hstack([np.hstack([l.dL_dEu.flatten(), l.dL_duuT.flatten()]) for l in self.layers])
+
     def set_vb_param(self, p):
         count = 0
         for l in self.layers:
@@ -59,6 +61,10 @@ class ColDeep(GPy.core.Model):
             l.q_of_U_mean.param_array = p[count:count+size]
             count += size
 
+    def plot(self, xlim=None):
+        plotting.plot_deep(self, xlim)
+
+            
 class ColDeepStochastic(ColDeep):
     """
         A Deep GP that can be optimized by stochastic methods. Only the
@@ -94,13 +100,6 @@ class ColDeepStochastic(ColDeep):
     def stochastic_fprime(self, w):
         self.set_batch()
         return self._grads(w)
-
-
-
-
-
-
-
 
 class ColDeepMPI(ColDeep):
     def __init__(self, layers, name, comm):
